@@ -9,7 +9,6 @@ mod tests {
 
     #[test]
     fn test_random_1024_bits() {
-        
         let p = BigUint::from_bytes_be(&hex::decode(constants::P).unwrap());
         let q = BigUint::from_bytes_be(&hex::decode(constants::Q).unwrap());
         let alpha = BigUint::from_bytes_be(&hex::decode(constants::ALPHA).unwrap());
@@ -34,14 +33,12 @@ mod tests {
         println!("x: {}", x);
         println!("k: {}", k);
         println!("c: {}", c);
-        
-        //solution 
+
+        //solution
         let s = zkp.solve(&k, &c, &x);
         //verification
         let result = zkp.verify(&r1, &r2, &y1, &y2, &c, &s);
-        
-        assert!(result);
 
-        
+        assert!(result);
     }
 }
