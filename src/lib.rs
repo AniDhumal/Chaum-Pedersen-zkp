@@ -1,7 +1,7 @@
 pub mod constants;
 
 use num_bigint::{BigUint, RandBigInt};
-
+use std::str::FromStr;
 pub struct ZKP {
     pub p: BigUint,
     pub q: BigUint,
@@ -50,4 +50,8 @@ impl ZKP {
         let rand_num = rng.gen_biguint_below(limit);
         rand_num
     }
+
+    // pub fn get_constants() -> (BigUint, BigUint, BigUint){
+    //     return (BigUint::from_str(constants::ALPHA).unwrap(), BigUint::from_str(constants::P).unwrap(), BigUint::from_str(constants::Q).unwrap());
+    // }
 }
