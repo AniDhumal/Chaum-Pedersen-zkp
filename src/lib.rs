@@ -1,6 +1,6 @@
 pub mod constants;
-
 use num_bigint::{BigUint, RandBigInt};
+use rand::Rng;
 use std::str::FromStr;
 pub struct ZKP {
     pub p: BigUint,
@@ -49,6 +49,14 @@ impl ZKP {
         let mut rng = rand::thread_rng();
         let rand_num = rng.gen_biguint_below(limit);
         rand_num
+    }
+
+    pub fn generate_random_string(size: usize) -> String {
+        let mut rng = rand::thread_rng();
+        rng.sample_iter(rand::distributions::Alphanumeric)
+            .take(size)
+            .map(char::from)
+            .collect()
     }
 
     // pub fn get_constants() -> (BigUint, BigUint, BigUint){

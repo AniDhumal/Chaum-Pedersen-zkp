@@ -6,11 +6,14 @@ use auth::{
     AuthenticationAnswerRequest, AuthenticationAnswerResponse, AuthenticationChallengeRequest,
     AuthenticationChallengeResponse, RegisterRequest, RegisterResponse,
 };
-use chaum_pedersen_zkp::{constants::{self, Q}, ZKP};
+use chaum_pedersen_zkp::{
+    constants::{self, Q},
+    ZKP,
+};
 
 use num_bigint::BigUint;
-use std::{collections::HashMap, str::FromStr};
 use std::sync::Mutex;
+use std::{collections::HashMap, str::FromStr};
 use tonic::{transport::Server, Code, Request, Response, Status};
 
 #[derive(Debug, Default)]
@@ -67,10 +70,11 @@ impl Auth for AuthImpl {
             Some(user_info) => {
                 user_info.r1 = BigUint::from_bytes_be(&request.r1);
                 user_info.r2 = BigUint::from_bytes_be(&request.r2);
-                let q = BigUint::from_str(Q).unwrap();
-                let c = ZKP::generate_random(&BigUint::from(q));
-                let c = BigUint::from(646_u32);
-                let auth_id = "AGF".to_string();
+                let q = BigUint::from_bytes_be(&hex::decode(constants::Q).unwrap());
+                println!("{:?}", q);
+                let c = ZKP::generate_random(&q);
+                let auth_id = ZKP::generate_random_string(12_usize);
+                user_info.c = c.clone();
                 let id_to_user = &mut self.auth_id_to_user.lock().unwrap();
                 id_to_user.insert(auth_id.clone(), user_name.clone());
                 return Ok(Response::new(AuthenticationChallengeResponse {
@@ -91,10 +95,55 @@ impl Auth for AuthImpl {
         &self,
         request: Request<AuthenticationAnswerRequest>,
     ) -> Result<Response<AuthenticationAnswerResponse>, Status> {
-        todo!()
+        let p = BigUint::from_bytes_be(&hex::decode(constants::P).unwrap());
+        let q = BigUint::from_bytes_be(&hex::decode(constants::Q).unwrap());
+        let alpha = BigUint::from_bytes_be(&hex::decode(constants::ALPHA).unwrap());
+        let beta = alpha.modpow(&ZKP::generate_random(&q), &p);
+        let zkp = ZKP {
+            p: p.clone(),
+            q: q.clone(),
+            alpha: alpha.clone(),
+            beta: beta.clone(),
+        };
+        let request = request.into_inner();
+        let auth_id = request.auth_id;
+        let mut id_to_user = self.auth_id_to_user.lock().unwrap();
+        let user_name = id_to_user.get_mut(&auth_id);
+        match user_name {
+            Some(user) => {
+                let mut user_info_map = self.user_info.lock().unwrap();
+                let user_info = user_info_map.get_mut(user).expect("AuthId invalid");
+                let c = user_info.c.clone();
+                let s = BigUint::from_bytes_be(&hex::decode(&request.s).unwrap());
+                let verify_result = zkp.verify(
+                    &user_info.r1,
+                    &user_info.r2,
+                    &user_info.y1,
+                    &user_info.y2,
+                    &c,
+                    &s,
+                );
+                let _ = match verify_result {
+                    true => {
+                        let session_id = ZKP::generate_random_string(12_usize);
+                        return Ok(Response::new(AuthenticationAnswerResponse { session_id }));
+                    }
+                    _ => {
+                        return Err(Status::new(
+                            Code::PermissionDenied,
+                            format!("Solution {} incorrect for auth id {}", s, auth_id),
+                        ))
+                    }
+                };
+            }
+            None => {
+                return Err(Status::new(
+                    Code::NotFound,
+                    format!("AuthId {} not found", auth_id),
+                ));
+            }
+        }
     }
-
-    
 }
 
 #[tokio::main] //for async functionality
